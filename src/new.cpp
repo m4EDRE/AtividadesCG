@@ -1,10 +1,4 @@
-/* Cubo Colorido com Transformações e Instâncias
- *
- * Adaptado do projeto “Hello Triangle” de Rossana Baptista Queiroz
- * para desenhar cubos coloridos, controlar translação e escala via teclado,
- * e instanciar múltiplos cubos na cena.
- * Última atualização em 07/03/2025
- */
+
 
 #include <iostream>
 #include <vector>
@@ -69,7 +63,8 @@ float scaleFactor = 1.0f;
 // Posições estáticas dos cubos (para instanciá-los na cena) 
 //Onde o cubo está na cena
 vector<glm::vec3> cubePositions = {
-    glm::vec3(0.0f,  0.0f, 1.0f),
+    glm::vec3(-0.5f, -0.5f, -1.0f),
+    glm::vec3(0.5f, 0.5f, 1.0f)
 };
 
 int main()
