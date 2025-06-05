@@ -1,5 +1,3 @@
-
-
 #include <iostream>
 #include <vector>
 
@@ -55,17 +53,24 @@ const GLchar* fragmentShaderSource = R"glsl(
 
 // Flags de rotação
 bool rotateX = false, rotateY = false, rotateZ = false;
-// Vetor de translação global
-glm::vec3 translation = glm::vec3(0.0f);
-// Escala uniforme global
-float scaleFactor = 1.0f;
 
-// Posições estáticas dos cubos (para instanciá-los na cena) 
-//Onde o cubo está na cena
+// Posições estáticas dos cubos (para instanciá-los na cena)
 vector<glm::vec3> cubePositions = {
     glm::vec3(-0.5f, -0.5f, -1.0f),
     glm::vec3(0.5f, 0.5f, 1.0f)
 };
+
+// Índice do cubo atualmente selecionado
+int selectedCubeIndex = 0;
+
+// Vetores de translação individuais por cubo
+vector<glm::vec3> cubeTranslations = {
+    glm::vec3(0.0f), // Cubo 0
+    glm::vec3(0.0f)  // Cubo 1
+};
+
+// Escala uniforme global
+float scaleFactor = 1.0f;
 
 int main()
 {
@@ -148,8 +153,8 @@ int main()
             // Matriz de modelo: identidade
             glm::mat4 model = glm::mat4(1.0f);
 
-            // 1) Aplica translação individual + offset global
-            model = glm::translate(model, cubePositions[i] + translation);
+            // 1) Aplica translação individual do cubo
+            model = glm::translate(model, cubePositions[i] + cubeTranslations[i]);
 
             // 2) Aplica rotação condicional
             if (rotateX) {
@@ -170,7 +175,7 @@ int main()
 
             // Desenha o cubo (36 vértices → 12 triângulos)
             glBindVertexArray(cubeVAO);
-            glDrawArrays(GL_TRIANGLES, 0, 64);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
             glBindVertexArray(0);
         }
 
@@ -203,152 +208,151 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         rotateX = false; rotateY = false; rotateZ = true;
     }
 
-    // Translação: WASD (X e Z), I (Y+), J (Y-)
+    // Translação individual do cubo selecionado, escala e troca de cubo
     if (action == GLFW_PRESS || action == GLFW_REPEAT) {
         const float delta = 0.05f;
+        glm::vec3& currentTranslation = cubeTranslations[selectedCubeIndex];
         switch (key) {
-            case GLFW_KEY_W: translation.z -= delta; break;
-            case GLFW_KEY_S: translation.z += delta; break;
-            case GLFW_KEY_A: translation.x -= delta; break;
-            case GLFW_KEY_D: translation.x += delta; break;
-            case GLFW_KEY_I: translation.y += delta; break;
-            case GLFW_KEY_J: translation.y -= delta; break;
-            // Escala uniforme: [ para diminuir, ] para aumentar
+            case GLFW_KEY_W: currentTranslation.z -= delta; break;
+            case GLFW_KEY_S: currentTranslation.z += delta; break;
+            case GLFW_KEY_A: currentTranslation.x -= delta; break;
+            case GLFW_KEY_D: currentTranslation.x += delta; break;
+            case GLFW_KEY_I: currentTranslation.y += delta; break;
+            case GLFW_KEY_J: currentTranslation.y -= delta; break;
+
+            // Escala uniforme global
             case GLFW_KEY_LEFT_BRACKET:  scaleFactor = std::max(0.1f, scaleFactor - 0.05f); break;
             case GLFW_KEY_RIGHT_BRACKET: scaleFactor += 0.05f; break;
+
+            // Trocar cubo selecionado (1 ou 2)
+            case GLFW_KEY_1: selectedCubeIndex = 0; break;
+            case GLFW_KEY_2: selectedCubeIndex = 1; break;
+
             default: break;
         }
     }
 }
 
-// Compila e linka shaders; retorna ID do programa
+// Cria e compila shaders, linka e retorna programa
 int setupShader()
 {
-    // Vertex Shader
+    // Vertex shader
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
     glCompileShader(vertexShader);
-    // Verifica erros
+
+    // Checa erros vertex shader
     GLint success;
     GLchar infoLog[512];
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
     if (!success) {
         glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-        std::cout << "ERROR::VERTEX_SHADER_COMPILATION_FAILED\n" << infoLog << std::endl;
+        cout << "Erro compilacao vertex shader: " << infoLog << endl;
     }
 
-    // Fragment Shader
+    // Fragment shader
     GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
     glCompileShader(fragmentShader);
-    // Verifica erros
+
+    // Checa erros fragment shader
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
     if (!success) {
         glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-        std::cout << "ERROR::FRAGMENT_SHADER_COMPILATION_FAILED\n" << infoLog << std::endl;
+        cout << "Erro compilacao fragment shader: " << infoLog << endl;
     }
 
-    // Programa de Shader
+    // Programa shader
     GLuint shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
-    // Verifica erros de linkagem
+
+    // Checa erros linkagem
     glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
     if (!success) {
         glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER_PROGRAM_LINKING_FAILED\n" << infoLog << std::endl;
+        cout << "Erro linkagem shader: " << infoLog << endl;
     }
 
-    // Limpa shaders individuais
+    // Limpa shaders (já linkados)
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
     return shaderProgram;
 }
 
-// Cria VBO + VAO com a geometria de um cubo colorido (36 vértices)
+// Setup da geometria do cubo (VBO + VAO)
 int setupGeometry()
 {
-    // Cada face do cubo (2 triângulos, 6 vértices) com uma cor sólida diferente.
-    // Ordem dos vértices: x, y, z,    r, g, b
+    // Vértices do cubo (posição e cor)
     GLfloat vertices[] = {
-        // Face frontal (z = +0.5) – cor vermelha
-         -0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
-          0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
-          0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
-         -0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
-          0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
-         -0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f,
+        // Posições          // Cores
+        -0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
+         0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+         0.5f,  0.5f, -0.5f, 0.0f, 0.0f, 1.0f,
+         0.5f,  0.5f, -0.5f, 0.0f, 0.0f, 1.0f,
+        -0.5f,  0.5f, -0.5f, 1.0f, 1.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
 
-        // Face traseira (z = -0.5) – cor verde
-         -0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
-          0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
-          0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
-         -0.5f, -0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
-          0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
-         -0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,
+        -0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 1.0f,
+         0.5f, -0.5f,  0.5f, 0.0f, 1.0f, 1.0f,
+         0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f,
+         0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f,
+        -0.5f,  0.5f,  0.5f, 0.5f, 0.5f, 0.5f,
+        -0.5f, -0.5f,  0.5f, 1.0f, 0.0f, 1.0f,
 
-        // Face esquerda (x = -0.5) – cor azul
-         -0.5f, -0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
-         -0.5f, -0.5f,  0.5f,  0.0f, 0.0f, 1.0f,
-         -0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,
-         -0.5f, -0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
-         -0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,
-         -0.5f,  0.5f, -0.5f,  0.0f, 0.0f, 1.0f,
+        -0.5f,  0.5f,  0.5f, 1.0f, 0.0f, 0.0f,
+        -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 1.0f,
+        -0.5f, -0.5f,  0.5f, 1.0f, 1.0f, 0.0f,
+        -0.5f,  0.5f,  0.5f, 1.0f, 0.0f, 0.0f,
 
-        // Face direita (x = +0.5) – cor amarela
-          0.5f, -0.5f, -0.5f,  1.0f, 1.0f, 0.0f,
-          0.5f, -0.5f,  0.5f,  1.0f, 1.0f, 0.0f,
-          0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.0f,
-          0.5f, -0.5f, -0.5f,  1.0f, 1.0f, 0.0f,
-          0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.0f,
-          0.5f,  0.5f, -0.5f,  1.0f, 1.0f, 0.0f,
+         0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 1.0f,
+         0.5f,  0.5f, -0.5f, 1.0f, 0.0f, 1.0f,
+         0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+         0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+         0.5f, -0.5f,  0.5f, 0.5f, 0.5f, 0.5f,
+         0.5f,  0.5f,  0.5f, 0.0f, 1.0f, 1.0f,
 
-        // Face de cima (y = +0.5) – cor ciano
-         -0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 1.0f,
-          0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 1.0f,
-          0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 1.0f,
-         -0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 1.0f,
-          0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 1.0f,
-         -0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 1.0f,
+         0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+         0.5f, -0.5f,  0.5f, 0.0f, 0.0f, 1.0f,
+         0.5f, -0.5f,  0.5f, 0.0f, 0.0f, 1.0f,
+        -0.5f, -0.5f,  0.5f, 1.0f, 1.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 1.0f,
 
-        // Face de baixo (y = -0.5) – cor magenta
-         -0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 1.0f,
-          0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 1.0f,
-          0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 1.0f,
-         -0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 1.0f,
-          0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 1.0f,
-         -0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 1.0f,
-
-
+        -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+         0.5f,  0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
+         0.5f,  0.5f,  0.5f, 0.0f, 0.0f, 1.0f,
+         0.5f,  0.5f,  0.5f, 0.0f, 0.0f, 1.0f,
+        -0.5f,  0.5f,  0.5f, 1.0f, 1.0f, 1.0f,
+        -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, 0.0f
     };
-         
-
-
-
-
-
 
     GLuint VBO, VAO;
-    // Gera e vincula VBO
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    // Envia dados para o buffer
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    // Gera e vincula VAO
+    // Cria buffers e arrays
     glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+
+    // Configura VAO
     glBindVertexArray(VAO);
 
-    // Atributo posição (location = 0)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
+    // VBO
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    // Posicao
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    // Atributo cor (location = 1)
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+
+    // Cor
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    // Desvincula VAO e VBO
+    // Unbind VAO e VBO
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
